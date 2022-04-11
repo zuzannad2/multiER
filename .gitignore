@@ -68,6 +68,9 @@ instance/
 # Scrapy stuff:
 .scrapy
 
+#vs
+.vs/
+
 # data
 ./raw_data/
 raw_data/
