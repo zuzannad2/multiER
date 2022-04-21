@@ -7,7 +7,8 @@ __pycache__/
 *.so
 
 # files/folders
-text_only/embeddings
+text_only/embeddings/
+./text_only/embeddings/
 
 # Distribution / packaging
 .Python
