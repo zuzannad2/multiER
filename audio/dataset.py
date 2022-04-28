@@ -6,15 +6,16 @@ import librosa
 import numpy as np
 
 class AudioDataset(Dataset):
-    def __init__(self, annotations_file, audio_dir):
+    def __init__(self, annotations_file, audio_dir, transform):
         '''
         Instantiates an AudioDataset object.
         '''
         self.annotations_file = annotations_file
         self.audio_dir = audio_dir
         self.filenames, self.labels = self._process_annotations()
-        self.num_features = 40 # 40 mfccs
+        self.num_features = 100 # 40 mfccs
         self.num_classes = 7
+
 
     def __len__(self):
         '''
@@ -26,23 +27,31 @@ class AudioDataset(Dataset):
         '''
         Loads and returns a sample from the dataset at the given index idx.
         '''
-        sample, _ = librosa.load(os.path.join(self.audio_dir, self.filenames[idx]), sr=16000, duration = 5)
+        sample, _ = librosa.load(os.path.join(self.audio_dir, self.filenames[idx]), sr=16000, duration = 3)
+        sample = (sample - sample.mean()) / (sample.std() + 1e-12)
         
         # Pad the signal with 0s to maximum length so that all signals are equal lengths
-        sample_homo = np.zeros((int(16000*5,)))
+        sample_homo = np.zeros((int(16000*3,)))
         sample_homo[:len(sample)] = sample
         sample = sample_homo
 
         augumented = self.awgn_augmentation(sample)
-        features = self.feature_mfcc(augumented)
+        
+        mfcc = self.feature_mfcc(augumented)
+        mfcc = np.mean(mfcc, axis=1)
+
+
+        
         label = self.labels[idx]
-        return torch.tensor(features).float(), label
+        
+        return torch.tensor([mfcc]).float(), label
 
     def _label_mapping(self, label):
         '''
         Converts textual labels to integer labels.
         '''
         emotions = {'anger':0, 'disgust':1, 'fear':2, 'joy':3, 'neutral':4, 'sadness':5, 'surprise':6}
+        #emotions = {'anger':0, 'disgust':1, 'fear':2, 'joy':3, 'sadness':4, 'surprise':5}
         return emotions[label]
 
     def _process_annotations(self):
@@ -71,7 +80,10 @@ class AudioDataset(Dataset):
 
         Returns: 40 MFCC coefficients per signal.
         '''
-        return librosa.feature.mfcc(y=sample, sr=16000, n_mfcc=40) 
+        return librosa.feature.mfcc(y=sample, sr=16000, n_mfcc=100) 
+
+    def feature_mel(self,x):
+        return librosa.feature.melspectrogram(x, sr=16000, n_mels=64)
 
     def awgn_augmentation(self, sample, multiples=2, bits=16, snr_min=15, snr_max=30): 
         '''
