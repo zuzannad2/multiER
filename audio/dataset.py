@@ -6,7 +6,7 @@ import librosa
 import numpy as np
 
 class AudioDataset(Dataset):
-    def __init__(self, annotations_file, audio_dir, transform):
+    def __init__(self, annotations_file, audio_dir):
         '''
         Instantiates an AudioDataset object.
         '''
