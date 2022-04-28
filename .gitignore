@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+# files/folders
+text_only/embeddings/
+./text_only/embeddings/
+.vscode/
+
 # Distribution / packaging
 .Python
 build/
