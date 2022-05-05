@@ -71,20 +71,15 @@ class LSTMnet_GateAtten(torch.nn.Module):
         # Batch-Norm
         chunk_lstm_out = self.bn(chunk_lstm_out)
         # chunk-level temporal aggregation
-        lstm_out = []
-        for i_batch in np.arange(0, len(chunk_lstm_out), C):
-            chunk_hidden = chunk_lstm_out[i_batch:i_batch+C]
-            # gated-attention weighted aggregation
-            attn_weights = self.attn(chunk_hidden)
-            attn_vector = torch.mean(torch.mul(chunk_hidden, attn_weights), dim=0)
-            lstm_out.append(attn_vector)  
-        lstm_out = torch.stack(lstm_out)
+        # lstm_out = []
+        # for i_batch in np.arange(0, len(chunk_lstm_out), C):
+        #     lstm_out.append(torch.mean(chunk_lstm_out[i_batch:i_batch+C], dim=0))
+        # lstm_out = torch.stack(lstm_out)
         # sentence-level output layer
-        outputs = self.fc1(lstm_out) 
+        outputs = self.fc1(chunk_lstm_out) 
         outputs = F.relu(outputs)
         outputs = self.fc2(outputs)
-        outputs = outputs.squeeze(1)
-        return outputs 
+        return outputs  
 
 class RnnAttenBlock(torch.nn.Module): 
     def __init__(self, hidden_dim):
@@ -131,21 +126,16 @@ class LSTMnet_RnnAtten(torch.nn.Module):
         self.fc1 = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.fc2 = nn.Linear(self.hidden_dim, self.output_dim) 
         # Chunk-level Attention Model
-        self.attn = RnnAttenBlock(self.hidden_dim) 
+        self.attn = RnnAttenBlock(self.hidden_dim)
     
     def forward(self, inputs):
         # LSTM-info flow
-        chunk_lstm_out, _ = self.lstm(inputs) 
-        chunk_lstm_out = chunk_lstm_out[:,-1,:]
+        lstm_out, _ = self.lstm(inputs) 
+        #lstm_out = lstm_out[:,-1,:]
         # Batch-Norm
-        chunk_lstm_out = self.bn(chunk_lstm_out)
-        # chunk-level temporal aggregation
-        # lstm_out = []
-        # for i_batch in np.arange(0, len(chunk_lstm_out), C):
-        #     lstm_out.append(torch.mean(chunk_lstm_out[i_batch:i_batch+C], dim=0))
-        # lstm_out = torch.stack(lstm_out)
-        # sentence-level output layer
-        outputs = self.fc1(chunk_lstm_out) 
+        lstm_out = self.bn(lstm_out)
+        
+        outputs = self.fc1(lstm_out) 
         outputs = F.relu(outputs)
         outputs = self.fc2(outputs)
         return outputs 
@@ -171,25 +161,17 @@ class LSTMnet_SelfAtten(torch.nn.Module):
     
     def forward(self, inputs):
         # LSTM-info flow
-        chunk_lstm_out, _ = self.lstm(inputs) 
-        chunk_lstm_out = chunk_lstm_out[:,-1,:]
+        lstm_out, _ = self.lstm(inputs) 
+        lstm_out = lstm_out[:,-1,:]
+        print('LSTM OUT', lstm_out.shape)
+        lstm_out = self.attn(lstm_out)
         # Batch-Norm
-        chunk_lstm_out = self.bn(chunk_lstm_out)
-        # chunk-level temporal aggregation
-        lstm_out = []
-        for i_batch in np.arange(0, len(chunk_lstm_out), C):
-            chunk_hidden = chunk_lstm_out[i_batch:i_batch+C]
-            chunk_hidden = chunk_hidden.unsqueeze(dim=0)
-            # self-attention weighted aggregation
-            attn_vector = self.attn(chunk_hidden)
-            attn_vector = attn_vector.squeeze(dim=0)
-            attn_vector = torch.mean(attn_vector, dim=0)
-            lstm_out.append(attn_vector)  
-        lstm_out = torch.stack(lstm_out)
-        # sentence-level output layer
+        lstm_out = self.bn(lstm_out)
         outputs = self.fc1(lstm_out) 
+        print('outputs fc1', outputs.shape)
         outputs = F.relu(outputs)
+        print('outputs relu', outputs.shape)
         outputs = self.fc2(outputs)
-        outputs = outputs.squeeze(1)
-        return outputs
+        print('outputs fc', outputs.shape)
+        return outputs 
 ###############################################################################

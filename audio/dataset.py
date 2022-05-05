@@ -1,3 +1,4 @@
+import pickle
 import torch
 from torch.utils.data import Dataset
 import os 
@@ -13,8 +14,7 @@ class AudioDataset(Dataset):
         self.annotations_file = annotations_file
         self.audio_dir = audio_dir
         self.filenames, self.labels = self._process_annotations()
-        self.num_features = 100 # 40 mfccs
-        self.num_classes = 7
+        self.embeddings = self._process_audio_embed_emotion()
 
 
     def __len__(self):
@@ -23,7 +23,7 @@ class AudioDataset(Dataset):
         '''
         return len(self.labels)
 
-    def __getitem__(self, idx):
+    def __getitem__2(self, idx):
         '''
         Loads and returns a sample from the dataset at the given index idx.
         '''
@@ -37,21 +37,28 @@ class AudioDataset(Dataset):
 
         augumented = self.awgn_augmentation(sample)
         
-        mfcc = self.feature_mfcc(augumented)
-        mfcc = np.mean(mfcc, axis=1)
+        #mfcc = self.feature_mfcc(augumented)
+        #mfcc = np.mean(mfcc, axis=1)
 
-
-        
         label = self.labels[idx]
         
-        return torch.tensor([mfcc]).float(), label
+        return torch.tensor([augumented]).float(), label
+    
+    def __getitem__(self, idx):
+        '''
+        Loads and returns a sample from the dataset at the given index idx.
+        '''
+        embedding = self.embeddings[idx]
+        label = self.labels[idx]
+        
+        return torch.tensor(embedding).float(), label
 
     def _label_mapping(self, label):
         '''
         Converts textual labels to integer labels.
         '''
         emotions = {'anger':0, 'disgust':1, 'fear':2, 'joy':3, 'neutral':4, 'sadness':5, 'surprise':6}
-        #emotions = {'anger':0, 'disgust':1, 'fear':2, 'joy':3, 'sadness':4, 'surprise':5}
+        #emotions = {'negative':0, 'neutral':1, 'positive':1}
         return emotions[label]
 
     def _process_annotations(self):
@@ -65,15 +72,32 @@ class AudioDataset(Dataset):
         corrupted_file2 = 'dia110_utt7.wav'
         data = pd.read_csv(self.annotations_file)
         data = data[['Emotion', 'Dialogue_ID', 'Utterance_ID']]
+        #data = data[['Sentiment', 'Dialogue_ID', 'Utterance_ID']]
         data['Filename'] = data.apply(lambda row: 'dia' + str(row.Dialogue_ID) + '_utt' + str(row.Utterance_ID) + '.wav', axis=1)
         data = data[['Filename', 'Emotion']]
-        data = data[data['Filename'] != corrupted_file]
-        data = data[data['Filename'] != corrupted_file2]
+        #data = data[data['Filename'] != corrupted_file]
+        #data = data[data['Filename'] != corrupted_file2]
         data['Emotion'] = data['Emotion'].apply(self._label_mapping) 
 
         return np.array(data['Filename']), np.array(data['Emotion'])
 
+    def _process_audio_embed_emotion(self):
+        with open('../data/pickles/audio_embeddings_feature_selection_emotion.pkl', 'rb') as f:
+            embeddings = pickle.load(f)
+        embeddings = embeddings[0]
 
+        return np.array([embeddings[k] for k in list(embeddings.keys())])
+
+    def _process_bert_embed_emotion(self):
+        f = open('bert_embeddings', 'r')
+        embeddings = []
+        for line in f.readlines():
+            line = line[1:-2]
+            embedding = line.split(', ')
+            embeddings.append(np.array(embedding, dtype=float))
+        
+        return np.array(embeddings)
+        
     def feature_mfcc(self, sample):
         '''
         Compute MFCCs for a given signal sample.
