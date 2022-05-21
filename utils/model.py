@@ -176,3 +176,42 @@ class LSTMnet_SelfAtten(torch.nn.Module):
         return outputs 
 ###############################################################################
 
+class LateFusion(torch.nn.Module):
+
+    def __init__(self):
+        super(LateFusion, self).__init__()
+        self.linear = torch.nn.Linear(14, 7)  # One in and one out
+
+    def forward(self, x):
+        y_pred = self.linear(x)
+        return y_pred
+    
+class LSTMnet_RnnAtten_late(torch.nn.Module): 
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
+        super(LSTMnet_RnnAtten_late, self).__init__()
+        # Net Parameters
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
+        self.num_layers = num_layers
+        # shared LSTM-layers
+        self.lstm = nn.LSTM(self.input_dim, self.hidden_dim, self.num_layers, dropout=0.5, batch_first=True, bidirectional=False)
+        # BatchNorm
+        self.bn = nn.BatchNorm1d(self.hidden_dim)
+        # Dense-Output-layers(Seq)
+        self.fc1 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.fc2 = nn.Linear(self.hidden_dim, self.output_dim) 
+        # Chunk-level Attention Model
+        self.attn = RnnAttenBlock(self.hidden_dim)
+    
+    def forward(self, inputs):
+        # LSTM-info flow
+        lstm_out, _ = self.lstm(inputs) 
+        #lstm_out = lstm_out[:,-1,:]
+        # Batch-Norm
+        lstm_out = self.bn(lstm_out)
+        
+        outputs = self.fc1(lstm_out) 
+        
+        outputs = self.fc2(outputs)
+        return outputs 

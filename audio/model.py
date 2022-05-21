@@ -162,16 +162,16 @@ class LSTMnet_SelfAtten(torch.nn.Module):
     def forward(self, inputs):
         # LSTM-info flow
         lstm_out, _ = self.lstm(inputs) 
-        lstm_out = lstm_out[:,-1,:]
-        print('LSTM OUT', lstm_out.shape)
+        #lstm_out = lstm_out[:,-1,:]
+        
         lstm_out = self.attn(lstm_out)
         # Batch-Norm
         lstm_out = self.bn(lstm_out)
         outputs = self.fc1(lstm_out) 
-        print('outputs fc1', outputs.shape)
+        
         outputs = F.relu(outputs)
-        print('outputs relu', outputs.shape)
+        
         outputs = self.fc2(outputs)
-        print('outputs fc', outputs.shape)
+        
         return outputs 
 ###############################################################################
