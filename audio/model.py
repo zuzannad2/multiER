@@ -67,7 +67,7 @@ class LSTMnet_GateAtten(torch.nn.Module):
     def forward(self, inputs):
         # LSTM-info flow
         chunk_lstm_out, _ = self.lstm(inputs) 
-        chunk_lstm_out = chunk_lstm_out[:,-1,:]
+        #chunk_lstm_out = chunk_lstm_out[:,-1,:]
         # Batch-Norm
         chunk_lstm_out = self.bn(chunk_lstm_out)
         # chunk-level temporal aggregation
@@ -150,7 +150,7 @@ class LSTMnet_SelfAtten(torch.nn.Module):
         self.output_dim = output_dim
         self.num_layers = num_layers
         # shared LSTM-layers
-        self.lstm = nn.LSTM(self.input_dim, self.hidden_dim, self.num_layers, dropout=0.5, batch_first=True, bidirectional=False)
+        self.lstm = nn.LSTM(self.input_dim, self.hidden_dim, self.num_layers, dropout=0.0, batch_first=True, bidirectional=False)
         # BatchNorm
         self.bn = nn.BatchNorm1d(self.hidden_dim)
         # Dense-Output-layers(Seq)
@@ -162,16 +162,14 @@ class LSTMnet_SelfAtten(torch.nn.Module):
     def forward(self, inputs):
         # LSTM-info flow
         lstm_out, _ = self.lstm(inputs) 
-        lstm_out = lstm_out[:,-1,:]
-        print('LSTM OUT', lstm_out.shape)
-        lstm_out = self.attn(lstm_out)
+        #lstm_out = lstm_out[:,-1,:]
         # Batch-Norm
         lstm_out = self.bn(lstm_out)
+        lstm_out = self.attn(lstm_out)
+        
         outputs = self.fc1(lstm_out) 
-        print('outputs fc1', outputs.shape)
         outputs = F.relu(outputs)
-        print('outputs relu', outputs.shape)
         outputs = self.fc2(outputs)
-        print('outputs fc', outputs.shape)
+        
         return outputs 
 ###############################################################################
