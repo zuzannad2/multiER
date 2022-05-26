@@ -3,6 +3,7 @@
 """
 @author: winston lin
 """
+from unicodedata import bidirectional
 import torch 
 import torch.nn as nn 
 import torch.nn.functional as F 
@@ -67,7 +68,7 @@ class LSTMnet_GateAtten(torch.nn.Module):
     def forward(self, inputs):
         # LSTM-info flow
         chunk_lstm_out, _ = self.lstm(inputs) 
-        chunk_lstm_out = chunk_lstm_out[:,-1,:]
+        
         # Batch-Norm
         chunk_lstm_out = self.bn(chunk_lstm_out)
         # chunk-level temporal aggregation
@@ -111,19 +112,23 @@ class RnnAttenBlock(torch.nn.Module):
         return attn_vector 
 
 class LSTMnet_RnnAtten(torch.nn.Module): 
-    def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers, bidirectional):
         super(LSTMnet_RnnAtten, self).__init__()
         # Net Parameters
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
         self.num_layers = num_layers
+        self.bidirectional = bidirectional
         # shared LSTM-layers
-        self.lstm = nn.LSTM(self.input_dim, self.hidden_dim, self.num_layers, dropout=0.5, batch_first=True, bidirectional=False)
+        self.lstm = nn.LSTM(self.input_dim, self.hidden_dim, self.num_layers, dropout=0.5, batch_first=True, bidirectional=self.bidirectional)
         # BatchNorm
-        self.bn = nn.BatchNorm1d(self.hidden_dim)
+        i=1
+        if self.bidirectional:
+            i = 2
+        self.bn = nn.BatchNorm1d(i*self.hidden_dim)
         # Dense-Output-layers(Seq)
-        self.fc1 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.fc1 = nn.Linear(i*self.hidden_dim, self.hidden_dim)
         self.fc2 = nn.Linear(self.hidden_dim, self.output_dim) 
         # Chunk-level Attention Model
         self.attn = RnnAttenBlock(self.hidden_dim)
@@ -178,13 +183,65 @@ class LSTMnet_SelfAtten(torch.nn.Module):
 
 class LateFusion(torch.nn.Module):
 
-    def __init__(self):
+    def __init__(self, input_dim, output_dim):
         super(LateFusion, self).__init__()
-        self.linear = torch.nn.Linear(14, 7)  # One in and one out
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+       
+        
+       
+        self.linear = torch.nn.Linear(input_dim, output_dim)  # One in and one out
 
     def forward(self, x):
-        y_pred = self.linear(x)
+       
+        y = F.relu(x)
+        y_pred = self.linear(y)
         return y_pred
+
+class LSTMnet_RnnAtten_latefusion(torch.nn.Module):
+    def __init__(self, input_dim_a, input_dim_b, hidden_dim_a, hidden_dim_b, hidden_dim, output_dim, num_layers_a, num_layers_b):
+        super(LSTMnet_RnnAtten_latefusion, self).__init__()
+        # Net Parameters
+        self.input_dim_a = input_dim_a
+        self.input_dim_b = input_dim_b
+        self.hidden_dim_a = hidden_dim_a
+        self.hidden_dim_b = hidden_dim_b
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
+        self.num_layers_a = num_layers_a
+        self.num_layers_b = num_layers_b
+        # shared LSTM-layers
+        self.lstm_a = nn.LSTM(self.input_dim_a, self.hidden_dim_a, self.num_layers_a, dropout=0.5, batch_first=True, bidirectional=False)
+        self.lstm_b = nn.LSTM(self.input_dim_b, self.hidden_dim_b, self.num_layers_b, dropout=0.5, batch_first=True, bidirectional=False)
+        
+        self.merge = nn.Linear(self.hidden_dim_a+hidden_dim_b, self.hidden_dim)
+        # BatchNorm
+        self.bn = nn.BatchNorm1d(self.hidden_dim_a+hidden_dim_b)
+        # Dense-Output-layers(Seq)
+        
+        self.fc3 = nn.Linear(self.hidden_dim, self.output_dim) 
+        
+        # Chunk-level Attention Model
+        self.attn = RnnAttenBlock(self.hidden_dim)
+    
+    def forward(self, x1, x2):
+        # LSTM-info flow
+        lstm_out_a, _ = self.lstm_a(x1)
+        lstm_out_b, _ = self.lstm_b(x2) 
+        #lstm_out = lstm_out[:,-1,:]
+        # Batch-Norm
+       
+        new_in =  torch.cat((lstm_out_a,lstm_out_b), dim=1)
+        lstm_out = self.bn(new_in)
+        outputs = self.merge(lstm_out)
+        
+        
+        
+        
+        # outputs = self.fc2(outputs)
+        outputs = F.relu(outputs)
+        outputs = self.fc3(outputs)
+        return outputs 
     
 class LSTMnet_RnnAtten_late(torch.nn.Module): 
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
